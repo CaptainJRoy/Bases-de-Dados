@@ -1,0 +1,178 @@
+Consultar Viagens:
+db.viagem.aggregate([
+    {
+        $lookup:
+            {
+                from: "estacao",
+                localField: "origem", 
+                foreignField: "_id", 
+                as: "origem"
+            }
+    },
+    {
+        $lookup:
+            {
+                from: "estacao",
+                localField:"destino", 
+                foreignField: "_id", 
+                as: "destino"
+            }
+    },
+    {
+        $match:
+            {
+                "origem.cidade": "Lisboa",
+                "destino.cidade": "Madrid"
+            }
+    },
+    {
+        $project:
+            {                
+                "horapartida" : { $dateToString: { format: "%H:%M", date: "$horapartida"}},
+                "horachegada" : { $dateToString: { format: "%H:%M", date: "$horachegada"}},
+                "origem": { $arrayElemAt: ["$origem", 0]},
+                "destino": { $arrayElemAt: ["$destino", 0]}
+            }
+    },
+    {
+        $project:
+            {                
+                "origem._id": 0,
+                "destino._id": 0
+            }
+    }
+]).pretty()
+
+Consultar Lugares
+db.viagem.aggregate([
+    {
+        $match:
+            {
+                "_id": ObjectId("58860dc263a09e0aed21576f")
+            }
+    },
+    {
+        $lookup:
+            {
+                from: "comboio",
+                localField: "comboio",
+                foreignField: "_id",
+                as: "comboio"
+            }
+    },
+    {
+        $lookup:
+            {
+                from: "bilhete",
+                localField: "_id",
+                foreignField: "viagem",
+                as: "bilhetes"
+            }
+    },
+    {
+        $project:
+            {                
+                "comboio": { $arrayElemAt: ["$comboio", 0]},
+                "bilhetes": 
+                    {
+                        $filter:
+                            {
+                                input: "$bilhetes",
+                                as: "bilhete",
+                                cond: { $eq : ["$$bilhete.viagem", Date("2017-01-06")]}
+                            }
+                    },
+                "ocupados": "$bilhetes.lugar"
+            }
+    },
+    {
+        $project:
+            {   
+                "_id": 0,             
+                "lugares": 
+                    {
+                        $filter:
+                            {
+                                input: "$comboio.lugares",
+                                as: "num",
+                                cond: { $not: [{$in: ["$$num", "$ocupados"]}]}
+                            }
+                    }
+            }
+    }
+    
+]).pretty()
+
+Consultar Bilhetes
+db.bilhete.aggregate([
+    {
+        $lookup:
+            {
+                from: "passageiro",
+                localField: "passageiro",
+                foreignField: "_id",
+                as: "passageiro"
+            }
+    },
+    {
+        $match:
+            {
+                "passageiro.email": "joaorui@email.com",
+                "passageiro.password": "joaorui"
+            }
+    },
+    {
+        $lookup:
+            {
+                from: "viagem",
+                localField: "viagem",
+                foreignField: "_id",
+                as: "viagem"
+            }
+    },
+    {
+        $project:
+            {
+                "_id": 0,
+                "lugar": 1,                
+                "viagem": { $arrayElemAt: ["$viagem", 0]},
+                "dataviagem": { $dateToString: { format: "%Y-%m-%d", date: "$dataviagem"}}
+            }
+    },
+    {
+        $lookup:
+            {
+                from: "estacao",
+                localField: "viagem.origem",
+                foreignField: "_id",
+                as: "origem"
+            }
+    },
+    {
+        $lookup:
+            {
+                from: "estacao",
+                localField: "viagem.destino",
+                foreignField: "_id",
+                as: "destino"
+            }
+    },
+    {
+        $project:
+            {
+                "viagem.horapartida" : { $dateToString: { format: "%H:%M", date: "$viagem.horapartida"}},
+                "viagem.horachegada" : { $dateToString: { format: "%H:%M", date: "$viagem.horachegada"}},
+                "origem": { $arrayElemAt: ["$origem", 0]},
+                "destino": { $arrayElemAt: ["$destino", 0]},
+                "lugar": 1,
+                "dataviagem": 1
+            }
+    },
+    {
+        $project:
+            {
+                "origem._id": 0,
+                "destino._id": 0
+            }
+    }
+]).pretty();
